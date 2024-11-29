@@ -20,7 +20,7 @@ body {
 }
 
 #chat-box {
-    width: 100%;
+    width: 96%;
     height: 300px;
     overflow-y: scroll;
     border: 1px solid #ddd;
@@ -31,7 +31,7 @@ body {
 }
 
 textarea {
-    width: 100%;
+    width: 96%;
     height: 80px;
     padding: 10px;
     border-radius: 5px;

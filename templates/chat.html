@@ -9,6 +9,13 @@
 <body>
 
 <div id="chat-container">
+    
+    <!-- URL Input Field -->
+    <div class="url-input">
+        <label for="url">Enter URL for Scraping:</label>
+        <input type="text" id="url" placeholder="Enter a URL to scrape" />
+    </div>
+
     <div id="chat-box">
         <!-- Display the chat history dynamically -->
         {% for message in chat_history %}
