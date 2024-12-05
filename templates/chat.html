@@ -13,7 +13,8 @@
     <!-- URL Input Field -->
     <div class="url-input">
         <label for="url">Enter URL for Scraping:</label>
-        <input type="text" id="url" placeholder="Enter a URL to scrape" />
+        <input type="text" class="form-control" id="url" placeholder="Enter a URL to scrape" />
+        <button onclick="scrapeData()">Scrape</button>
     </div>
 
     <div id="chat-box">
@@ -24,6 +25,9 @@
             </div>
         {% endfor %}
     </div>
+
+    <div id="scraped-data-container"></div>
+
     <textarea id="user-input" placeholder="Type your message..."></textarea>
     <button onclick="sendMessage()">Send</button>
 </div>

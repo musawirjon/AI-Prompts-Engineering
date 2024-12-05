@@ -1,3 +1,31 @@
+function scrapeData() {
+    const url = document.getElementById('url').value;  // Get the URL from the input field
+    
+    fetch('/scrap-webpage', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ url: url })  // Send URL in JSON format
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.message === "Webpage scraped and data stored in FAISS.") {
+            console.log("Scraped Data:", data.scraped_data);
+            // Display scraped content on the page or do further processing
+            document.getElementById("scraped-data-container").innerHTML = `
+                <h3>Scraped Data</h3>
+                <p><strong>URL:</strong> ${data.scraped_data.url}</p>
+                <p><strong>Content:</strong> ${data.scraped_data.content}</p>
+            `;
+        } else {
+            alert('Error: ' + data.message);
+        }
+    })
+    .catch(error => {
+        alert('Error: ' + error);
+    });
+}
 // Function to handle sending the message
 function sendMessage() {
     const userInput = document.getElementById("user-input").value;
@@ -42,3 +70,4 @@ function displayMessage(message, role) {
     chatBox.appendChild(messageDiv);
     chatBox.scrollTop = chatBox.scrollHeight; // Scroll to the bottom
 }
+

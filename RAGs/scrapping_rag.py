@@ -1,8 +1,9 @@
 import faiss
 import numpy as np
-from sentence_transformers import SentenceTransformer
-from openai import AzureOpenAI
+from langchain_openai import AzureOpenAIEmbeddings
+from langchain_openai import AzureOpenAI
 import os
+import json
 
 class ScrappingRag:
     def __init__(self):
@@ -11,29 +12,34 @@ class ScrappingRag:
         self.API_KEY = os.getenv("OPENAI_API_KEY")
         self.MODEL_NAME = os.getenv("MODEL_NAME")
         self.VERSION = os.getenv("VERSION")
-        self.client = AzureOpenAI(azure_endpoint=self.endpoint,api_version=self.VERSION,api_key=self.API_KEY)
+        self.client = AzureOpenAI(azure_endpoint=self.endpoint, api_version=self.VERSION, api_key=self.API_KEY)
 
-    def initialize_faiss_index():
-         # Initialize FAISS index (this will store your document embeddings)
-        dimension = 1536 # Size of OpenAI embeddings
-        index = faiss.IndexFlatL2(dimension) # Using L2 (Euclidean) distance for simplicity
+    def get_embeddings(self, text_data):
+        embeddings = AzureOpenAIEmbeddings(
+            openai_api_key=self.API_KEY,
+            deployment="cubeone-embedding-deployment",  # Deployment should match the embedding model used
+            openai_api_version=self.VERSION,
+            azure_endpoint=self.endpoint,
+            openai_api_type="azure"
+        )
+
+        text_embeddings = embeddings.embed_documents(text_data)
+        return text_embeddings
+    
+    def create_faiss_index(self, texts):
+        embeddings = self.get_embeddings(texts)
+        self.save_embeddings_to_json(embeddings, texts)  # Save embeddings to JSON
+
+        index = faiss.IndexFlatL2(len(embeddings[0]))
+        index.add(np.array(embeddings))
+        index_path = index_path="faiss_index.index"
+        faiss.write_index(index, index_path)
         return index
 
-    # Store document and embeddings in FAISS
-    def store_in_faiss(text, index):
-        model = SentenceTransformer('all-MiniLM-L6-v2')  # Pretrained sentence-transformer model
-        embeddings = model.encode([text])
-
-        # Convert embeddings to float32 (required by FAISS)
-        embeddings = np.array(embeddings).astype('float32')
-
-        # Add embeddings to FAISS index
-        index.add(embeddings)
-
-    def search_faiss(query, index):
-        model = SentenceTransformer('all-MiniLM-L6-v2')
-        query_embedding = model.encode([query]).astype('float32')
-
-        # Perform the search in FAISS index
-        _, indices = index.search(query_embedding, k=1)  # Get top 1 result
-        return indices
+    def save_embeddings_to_json(self, embeddings, texts, filename="embeddings.json"):
+        data = {
+            "embeddings": embeddings,
+            "texts": texts
+        }
+        with open(filename, 'w') as f:
+            json.dump(data, f)

@@ -69,3 +69,22 @@ button:hover {
     background-color: #d1e7f5;
     align-self: flex-end;
 }
+.url-input label {
+    font-size: 14px;
+    color: #333;
+    margin-bottom: 5px;
+}
+/* Input field styling */
+.form-control {
+    padding: 10px;
+    border: 2px solid #ccc;
+    border-radius: 5px;
+    font-size: 16px;
+    width: 100%;
+    box-sizing: border-box;
+    outline: none;
+}
+/* Input field focus effect */
+.form-control:focus {
+    border-color: #4CAF50;
+}

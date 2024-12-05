@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 class ScrapDataController():
     def __init__(self):
         pass
-    def scrape_data(url):
+    def scrape_data(selft, url):
         response = requests.get(url)
         soup = BeautifulSoup(response.text, 'html.parser')
 
