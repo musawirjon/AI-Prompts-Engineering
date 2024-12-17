@@ -1,30 +1,48 @@
 from flask import jsonify
-import os
+import duckdb
 import json
 
 class ChatModel():
     def __init__(self):
-        self.history_file = "conversation_history.json"
-        # If the file doesn't exist, create it
-        if not os.path.exists(self.history_file):
-            with open(self.history_file, 'w') as f:
-                json.dump([], f)
+        self.conn = None
+        self.connect()
+
+    def connect(self):
+        try:
+            self.conn = duckdb.connect('chat_history.db', read_only=False, allow_concurrent_connections=True)
+        except Exception as e:
+            print(f"Failed to connect to database: {e}")
+
+    def __del__(self):
+        if self.conn:
+            self.conn.close()
 
     def dictionary_store(self, message):
         if 'content' in message:
-            message['content'] = message['content'] + "\n" 
-        # Load the conversation history from the file
-        with open(self.history_file, 'r') as f:
-            conversation_history = json.load(f)
+            message['content'] = message['content'] + "\n"
         
-        # Append the new message to the conversation history
-        conversation_history.append(message)
-
-        # Save the updated conversation history back to the file
-        with open(self.history_file, 'w') as f:
-            json.dump(conversation_history, f)
+        # Insert the message into DuckDB
+        self.conn.execute("""
+            INSERT INTO qa (role, content)
+            VALUES (?, ?)
+        """, [message.get('role'), message.get('content')])
+        
+        self.conn.commit()
     
     def get_conversation(self):
-        # Load and return the conversation history from the file
-        with open(self.history_file, 'r') as f:
-            return json.load(f)
+        # Retrieve all messages from the database
+        result = self.conn.execute("""
+            SELECT role, content 
+            FROM qa 
+            ORDER BY timestamp ASC
+        """).fetchall()
+        
+        # Convert to list of dictionaries format
+        conversation = []
+        for row in result:
+            conversation.append({
+                'role': row[0],
+                'content': row[1]
+            })
+            
+        return conversation

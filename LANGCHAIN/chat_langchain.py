@@ -1,74 +1,94 @@
 import os
 from dotenv import load_dotenv
 import json
-from langchain_openai import AzureOpenAIEmbeddings
-from langchain_community.vectorstores import FAISS
-from langchain.chains import RetrievalQA 
-from langchain_community.docstore.in_memory import InMemoryDocstore
-import faiss
-import numpy as np
+from langchain_openai import AzureOpenAIEmbeddings, AzureOpenAI
+from langchain_community.vectorstores import Chroma
+from langchain.chains import RetrievalQA
+import chromadb
+from chromadb.config import Settings
+from datetime import datetime
+from typing import List, Optional
 
 class ChatLangchain:
     def __init__(self):
-        # Load environment variables from a `.env` file (optional)
+        # Load environment variables from a `.env` file
         load_dotenv()
 
-        self.name = "Scrapping RAG"
+        self.name = "Chat Langchain"
         self.endpoint = os.getenv("OPENAI_API_URL")
         self.api_key = os.getenv("OPENAI_API_KEY").strip()
         self.model_name = os.getenv("MODEL_NAME")
         self.version = os.getenv("VERSION")
 
-        # For debugging, print loaded environment variables (optional)
-        # print('===============================', self.api_key, '===============================')
-
-        # Validate required environment variables (recommended)
+        # Validate required environment variables
         if not all([self.endpoint, self.api_key, self.model_name, self.version]):
-            raise ValueError("Missing required environment variables: OPENAI_API_URL, OPENAI_API_KEY, MODEL_NAME, VERSION")
+            raise ValueError("Missing required environment variables")
 
-        # Construct the full URL using f-strings for clarity
-        self.api_url = f"{self.endpoint}/openai/deployments/{self.model_name}/chat/completions?api-version={self.version}"
+        # Initialize Azure OpenAI client
+        self.client = AzureOpenAI(
+            azure_endpoint=self.endpoint,
+            api_version=self.version,
+            api_key=self.api_key
+        )
 
-        # Print the constructed API URL for informational purposes
-        print(f"Constructed API URL: {self.api_url}")
- 
-    def initialize_langchain(self):
-        
-        def load_faiss_index(self, index_path="faiss_index.index"):
-            return faiss.read_index(index_path)
-        
-        index = load_faiss_index
+        # Initialize ChromaDB client with persistent storage
+        self.persist_directory = "chroma_storage"
+        self.embeddings = self._create_embeddings()
+        self.vectorstore = None
 
-        def index_to_docstore_id(self,index_id):
-            # Implement your logic to map index IDs to document IDs
-            return str(index_id)
-        
-        docstore = InMemoryDocstore({})
-
-        embeddings = AzureOpenAIEmbeddings(
+    def _create_embeddings(self) -> AzureOpenAIEmbeddings:
+        """Create Azure OpenAI embeddings instance"""
+        return AzureOpenAIEmbeddings(
             openai_api_key=self.api_key,
             deployment="cubeone-embedding-deployment",
             openai_api_version=self.version,
             azure_endpoint=self.endpoint,
             openai_api_type="azure"
         )
-        # Create FAISS vector store
-        vectorstore = FAISS(
-            index=index,
-            embedding_function=embeddings,
-            docstore=docstore,
-            index_to_docstore_id=index_to_docstore_id
-        )
 
-        # Create RetrievalQA chain with AzureOpenAI embeddings and FAISS retriever
+    def initialize_langchain(self) -> RetrievalQA:
+        """Initialize or get the QA chain with the current vector store"""
+        if not self.vectorstore:
+            # Initialize with empty vector store if none exists
+            self.vectorstore = Chroma(
+                persist_directory=self.persist_directory,
+                embedding_function=self.embeddings
+            )
+
+        # Create RetrievalQA chain
         qa_chain = RetrievalQA.from_chain_type(
-            llm=embeddings,
-            retriever=vectorstore.as_retriever()
+            llm=self.client,
+            retriever=self.vectorstore.as_retriever()
         )
 
         return qa_chain
 
-    def load_embeddings_from_json(self, filename="embeddings.json"):
-        with open(filename, 'r') as f:
-            data = json.load(f)
-        return np.array(data["embeddings"]), data["texts"]
+    def load_documents(self, texts: List[str], metadatas: Optional[List[dict]] = None):
+        """Load documents into the vector store"""
+        # Create or update vector store
+        self.vectorstore = Chroma.from_texts(
+            texts=texts,
+            embedding=self.embeddings,
+            metadatas=metadatas,
+            persist_directory=self.persist_directory
+        )
+        
+        # Save metadata for reference
+        self._save_metadata(texts, metadatas)
+        
+        return self.vectorstore
+
+    def _save_metadata(self, texts: List[str], metadatas: Optional[List[dict]], 
+                      filename: str = "vector_store_metadata.json"):
+        """Save metadata about stored documents"""
+        metadata = {
+            "timestamp": datetime.now().isoformat(),
+            "num_documents": len(texts),
+            "document_sample": texts[:3] if texts else [],  # Save first 3 documents as sample
+            "sources": [m.get("source") for m in metadatas[:3]] if metadatas else []
+        }
+        
+        os.makedirs(self.persist_directory, exist_ok=True)
+        metadata_path = os.path.join(self.persist_directory, filename)
+        with open(metadata_path, 'w') as f:
+            json.dump(metadata, f, indent=4)
